@@ -8,7 +8,7 @@ on:
       - prod
 
 permissions:
-  id-token: write   # required for OIDC
+  id-token: write
   contents: read
 
 jobs:
@@ -19,14 +19,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Authenticate to AWS (recommended: OIDC + an IAM role)
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}  # e.g., arn:aws:iam::<account-id>:role/<role-name>
-          aws-region: ${{ secrets.AWS_REGION }}        # e.g., ap-south-1
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-      # Get an ECR login (provides ${{ steps.ecr.outputs.registry }})
       - name: Login to Amazon ECR
         id: ecr
         uses: aws-actions/amazon-ecr-login@v2
@@ -41,16 +39,20 @@ jobs:
             echo "IMAGE_TAG=prod" >> $GITHUB_ENV
           fi
 
-      # Optional: ensure the ECR repository exists
       - name: Ensure ECR repository exists
         run: |
           aws ecr describe-repositories --repository-names "${{ secrets.ECR_REPOSITORY }}" >/dev/null 2>&1 || \
           aws ecr create-repository --repository-name "${{ secrets.ECR_REPOSITORY }}"
 
+      - name: Debug files in workspace
+        run: |
+          echo "Files in workspace:"
+          ls -R
+
       - name: Build Docker image
         env:
           ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}   # just the repo name, e.g., my-app
+          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
         run: |
           FULL_TAG="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
           docker build -t "$FULL_TAG" .
